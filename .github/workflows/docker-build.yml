@@ -39,9 +39,9 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq
 
-      - name: KestrelsDevelopment/Workflows/.github/actions/docker-generate-build-matrix@main
+      - name: Generate build matrix
         id: matrix
-        uses: ./.github/actions/generate-matrix
+        uses: KestrelsDevelopment/Workflows/.github/actions/docker-generate-build-matrix@main
         with:
           build_compose_path: build-compose.yml
 
