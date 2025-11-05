@@ -25,7 +25,7 @@ runs:
     steps: 
       - name: "Install dependencies"
         if: ${{ inputs.restore == true }}
-        uses: KestrelsDevelopment/.github/.github/actions/dotnet-restore@main
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-restore@main
         with:
             solution-path: ${{ inputs.solution-path }}
 

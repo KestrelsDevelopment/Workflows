@@ -26,11 +26,11 @@ jobs:
                 nix_path: nixpkgs=channel:nixos-unstable
 
           - name: Update lockfile
-            uses: KestrelsDevelopment/.github/.github/actions/nix-update-flake@main
+            uses: KestrelsDevelopment/Workflows/.github/actions/nix-update-flake@main
             with:
                 flake-path: ${{ inputs.flake-path }}
 
           - name: Commit changes
-            uses: KestrelsDevelopment/.github/.github/actions/git-commit-changes@main
+            uses: KestrelsDevelopment/Workflows/.github/actions/git-commit-changes@main
             with:
                 commit-message: "[chore] Update flake lock"
