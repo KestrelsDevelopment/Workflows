@@ -1,0 +1,28 @@
+name: "Generate build matrix"
+description: "Parse build-compose.yml and output a matrix JSON (expects yq + jq installed)"
+inputs:
+  build_compose_path:
+    description: "Path to build-compose.yml"
+    required: false
+    default: build-compose.yml
+outputs:
+  matrix:
+    description: "JSON object suitable for fromJson, e.g. {\"include\":[...]}"
+    value: ${{ steps.make.outputs.matrix }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: make
+      shell: bash
+      run: |
+        set -euo pipefail
+        MATRIX=$(yq eval -o=json '.services | to_entries | map({
+          "service": .key,
+          "image": .value.image,
+          "context": .value.build.context,
+          "dockerfile": .value.build.dockerfile
+        })' "${{ inputs.build_compose_path }}" | jq -c '{"include": .}')
+        echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+        echo "Generated matrix:"
+        echo "$MATRIX" | jq '.'
