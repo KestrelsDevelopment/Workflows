@@ -1,0 +1,38 @@
+name: "Build Docker image"
+description: "Build (and optionally push) a Docker image for one service using docker/build-push-action"
+inputs:
+  context:
+    description: "Build context directory"
+    required: true
+  dockerfile:
+    description: "Path to Dockerfile (relative to repo root)"
+    required: true
+  platforms:
+    description: "Comma-separated platforms (e.g., linux/amd64,linux/arm64)"
+    required: false
+    default: linux/amd64,linux/arm64
+  push:
+    description: "true to push, false to load (PRs usually false)"
+    required: false
+    default: "true"
+  tags:
+    description: "Newline-separated tags for the image"
+    required: true
+  labels:
+    description: "Newline-separated labels for the image"
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - name: Build and push
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        platforms: ${{ inputs.platforms }}
+        push: ${{ inputs.push }}
+        tags: ${{ inputs.tags }}
+        labels: ${{ inputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
