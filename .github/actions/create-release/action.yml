@@ -1,0 +1,83 @@
+name: Create or Replace Tag & Release
+description: Create a tag and GitHub Release
+author: AceOfKestrels
+
+inputs:
+    name:
+        description: "The tag and release name (e.g. v1.2.3)"
+        required: true
+    body:
+        description: "Release notes/body text"
+        required: false
+        default: ""
+    files:
+        description: "Newline-separated list of asset file paths to upload"
+        required: false
+        default: ""
+
+runs:
+    using: composite
+    steps:
+      - name: Create or replace release via gh
+        shell: bash
+        env:
+            GH_TOKEN: ${{ github.token }}
+            GH_REPO: ${{ github.repository }}
+            TAG_NAME: ${{ inputs.name }}
+            BODY: ${{ inputs.body }}
+            FILES: ${{ inputs.files }}
+            TARGET_SHA: ${{ github.sha }}
+        run: |
+            set -euo pipefail
+
+            echo "::group::Delete existing release (if any)"
+            if gh release view "$TAG_NAME" --repo "$GH_REPO" >/dev/null 2>&1; then
+                echo "Existing release '$TAG_NAME' found. Deleting..."
+                gh release delete "$TAG_NAME" --repo "$GH_REPO" -y --cleanup-tag
+            fi
+            echo "::endgroup::"
+
+            echo "::group::Ensure tag is removed"
+            remote_ref="$(git ls-remote --tags "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}" "refs/tags/${TAG_NAME}" || true)"
+            if [ -n "${remote_ref:-}" ]; then
+                echo "Remote tag refs/tags/${TAG_NAME} exists. Deleting..."
+                git push "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}" ":refs/tags/${TAG_NAME}" || true
+            fi
+            echo "::endgroup::"
+
+            echo "::group::Prepare notes and assets"
+            notes_file="$(mktemp)"
+            printf '%s' "${BODY:-}" > "$notes_file"
+
+            # Build an array of files from newline-separated input
+            files_to_upload=()
+            while IFS= read -r line; do
+                # Trim leading/trailing whitespace
+                f="${line#"${line%%[![:space:]]*}"}"
+                f="${f%"${f##*[![:space:]]}"}"
+                [ -z "${f:-}" ] && continue
+                if [ ! -f "$f" ]; then
+                    echo "Specified asset not found: $f" >&2
+                    exit 1
+                fi
+                files_to_upload+=("$f")
+            done <<< "${FILES:-}"
+            echo "Found ${#files_to_upload[@]} asset(s) to upload."
+            echo "::endgroup::"
+
+            echo "::group::Create release '$TAG_NAME' at $TARGET_SHA"
+            if [ "${#files_to_upload[@]}" -gt 0 ]; then
+                gh release create "$TAG_NAME" \
+                    --repo "$GH_REPO" \
+                    --target "$TARGET_SHA" \
+                    --title "$TAG_NAME" \
+                    --notes-file "$notes_file" \
+                    "${files_to_upload[@]}"
+            else
+                gh release create "$TAG_NAME" \
+                    --repo "$GH_REPO" \
+                    --target "$TARGET_SHA" \
+                    --title "$TAG_NAME" \
+                    --notes-file "$notes_file"
+            fi
+            echo "::endgroup::"

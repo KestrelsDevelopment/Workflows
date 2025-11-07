@@ -1,0 +1,45 @@
+name: Upload file
+description: Upload a file to a KestrelsDevelopment/FileApi
+author: AceOfKestrels
+
+inputs:
+    url:
+        description: "The URL to upload to"
+        required: true
+    file-path:
+        description: "The path of the file to upload"
+        required: true
+    api-key:
+        description: The PSK used for authentication
+        required: true
+
+outputs:
+    download-url:
+        description: "The url the file can be downloaded from"
+        value: ${{ steps.upload.outputs.download-url }}
+
+runs:
+    using: composite
+    steps: 
+      - name: "Upload file"
+        id: "upload"
+        shell: bash
+        env:
+            FILE_API_KEY: ${{ inputs.api-key }}
+            UPLOAD_URL: ${{ inputs.url }}
+            FILE_PATH: ${{ inputs.file-path }}
+        run: | 
+            set -euo pipefail
+
+            response=$(curl -sS -f -X POST "$UPLOAD_URL" \
+                -H "Authorization: $FILE_API_KEY" \
+                -F "file=@$FILE_PATH")
+
+            latest_path="$(echo "$response" | jq -r '.latestPath // empty')"
+
+            if [ -z "$latest_path" ]; then
+                echo "No latest URL found in response"
+                exit 1
+            fi
+
+            echo "download-url=$UPLOAD_URL$latest_path" >> "$GITHUB_OUTPUT"
