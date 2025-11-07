@@ -37,16 +37,9 @@ runs:
             checksum=$(sha256sum -- "$FILE_PATH" | awk '{print $1}')
             echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
 
-            response=$(curl -sS -f -X POST "$UPLOAD_URL/upload" \
+            curl -sS -f -X POST "$UPLOAD_URL/upload" \
                 -H "Authorization: $FILE_API_KEY" \
                 -H "Checksum: $checksum" \
-                -F "file=@$FILE_PATH")
+                -F "file=@$FILE_PATH"
 
-            latest_path="$(printf '%s' "$response" | jq -r '.latestPath // empty')"
-
-            if [ -z "$latest_path" ]; then
-                echo "No latest URL found in response"
-                exit 1
-            fi
-
-            echo "download-url=$UPLOAD_URL$latest_path" >> "$GITHUB_OUTPUT"
+            echo "download-url=$UPLOAD_URL/download" >> "$GITHUB_OUTPUT"
