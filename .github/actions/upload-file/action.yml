@@ -31,7 +31,7 @@ runs:
         run: | 
             set -euo pipefail
 
-            response=$(curl -sS -f -X POST "$UPLOAD_URL" \
+            response=$(curl -sS -f -X POST "$UPLOAD_URL/upload" \
                 -H "Authorization: $FILE_API_KEY" \
                 -F "file=@$FILE_PATH")
 
