@@ -35,7 +35,7 @@ runs:
                 -H "Authorization: $FILE_API_KEY" \
                 -F "file=@$FILE_PATH")
 
-            latest_path="$(echo "$response" | jq -r '.latestPath // empty')"
+            latest_path="$(printf '%s' "$response" | jq -r '.latestPath // empty')"
 
             if [ -z "$latest_path" ]; then
                 echo "No latest URL found in response"
