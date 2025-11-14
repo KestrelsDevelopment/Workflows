@@ -1,0 +1,54 @@
+name: NuGet - Generate Pack Matrix
+description: Discover packable csproj files and emit a build matrix
+inputs:
+  projects_glob:
+    description: Glob for projects
+    required: true
+  exclude_glob:
+    description: Glob to exclude
+    required: true
+outputs:
+  matrix:
+    description: JSON matrix for strategy
+    value: ${{ steps.gen.outputs.matrix }}
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      id: gen
+      run: |
+        set -euo pipefail
+        sudo apt-get update -y
+        sudo apt-get install -y jq
+        shopt -s globstar nullglob
+
+        include=()
+
+        # expand project glob(s)
+        while IFS= read -r pat; do
+          for f in $pat; do
+            [[ -f "$f" ]] || continue
+            # exclude tests
+            if [[ "$f" == "${{ inputs.exclude_glob }}" ]]; then
+              continue
+            fi
+            # skip explicitly non-packable
+            if grep -q "<IsPackable>\\s*false\\s*</IsPackable>" "$f"; then
+              continue
+            fi
+            include+=( "$f" )
+          done
+        done < <(printf "%s\n" "${{ inputs.projects_glob }}")
+
+        if (( ${#include[@]} == 0 )); then
+          echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        json=$(jq -n --argjson arr "$(printf '%s\n' "${include[@]}" | jq -R . | jq -s .)" '
+          { include:
+            ( $arr | map({ project: ., project_dir: ( . | sub("/[^/]+$"; "") ) })
+          ) }')
+        echo "matrix=$json" >> "$GITHUB_OUTPUT"
+    - run: echo "Matrix generated."
+      shell: bash

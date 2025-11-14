@@ -1,0 +1,11 @@
+name: NuGet - Restore
+description: dotnet restore
+inputs:
+  project:
+    description: Path to csproj
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: dotnet restore "${{ inputs.project }}"

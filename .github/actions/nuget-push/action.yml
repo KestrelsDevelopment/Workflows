@@ -1,0 +1,47 @@
+# .github/actions/nuget-push/action.yml
+name: NuGet - Push
+description: Push .nupkg (and optional .snupkg) to a feed
+inputs:
+  artifacts_path:
+    description: Directory containing packages
+    required: true
+    default: artifacts
+  source:
+    description: NuGet source URL
+    required: true
+  api_key:
+    description: NuGet API key
+    required: true
+  push_symbols:
+    description: Also push .snupkg
+    required: true
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        NUGET_API_KEY: ${{ inputs.api_key }}
+      run: |
+        set -euo pipefail
+        shopt -s nullglob
+
+        # Push main packages
+        nupkgs=( "${{ inputs.artifacts_path }}"/*.nupkg )
+        if (( ${#nupkgs[@]} == 0 )); then
+          echo "::error::No .nupkg files found in ${{ inputs.artifacts_path }}"
+          exit 1
+        fi
+        for pkg in "${nupkgs[@]}"; do
+          echo "Pushing $pkg to ${{ inputs.source }} ..."
+          dotnet nuget push "$pkg" --api-key "$NUGET_API_KEY" --source "${{ inputs.source }}" --skip-duplicate
+        done
+
+        # Optionally push symbols
+        if [[ "${{ inputs.push_symbols }}" == "true" ]]; then
+          snupkgs=( "${{ inputs.artifacts_path }}"/*.snupkg )
+          for spkg in "${snupkgs[@]}"; do
+            echo "Pushing symbols $spkg ..."
+            dotnet nuget push "$spkg" --api-key "$NUGET_API_KEY" --source "${{ inputs.source }}" --skip-duplicate
+          done
+        fi

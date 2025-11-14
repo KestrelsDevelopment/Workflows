@@ -1,0 +1,34 @@
+name: NuGet - Pack
+description: dotnet pack with symbols and version
+inputs:
+  project:
+    description: Path to csproj
+    required: true
+  configuration:
+    description: Build configuration
+    required: true
+    default: Release
+  artifacts_path:
+    description: Output directory
+    required: true
+    default: artifacts
+  version:
+    description: Package version
+    required: true
+  symbols:
+    description: Produce symbols
+    required: true
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        mkdir -p "${{ inputs.artifacts_path }}"
+        dotnet pack "${{ inputs.project }}" \
+          -c "${{ inputs.configuration }}" \
+          -o "${{ inputs.artifacts_path }}" \
+          -p:ContinuousIntegrationBuild=true \
+          -p:IncludeSymbols=${{ inputs.symbols }} \
+          -p:SymbolPackageFormat=snupkg \
+          -p:Version="${{ inputs.version }}"

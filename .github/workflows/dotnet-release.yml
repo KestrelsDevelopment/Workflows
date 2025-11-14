@@ -1,0 +1,134 @@
+﻿# .github/workflows/nuget-publish.yml
+name: Build and Publish NuGet Packages
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Package version to use for dotnet pack (e.g., 1.2.3 or 1.2.3-beta.1)
+        required: true
+        type: string
+      projects_glob:
+        description: Glob to discover packable csproj files
+        required: false
+        type: string
+        default: "**/*.csproj"
+      exclude_glob:
+        description: Glob to exclude (e.g., test projects)
+        required: false
+        type: string
+        default: "**/*[Tt]est*.csproj"
+      dotnet_version:
+        description: .NET SDK version
+        required: true
+        type: string
+      source:
+        description: NuGet feed/source URL
+        required: false
+        type: string
+        default: "https://api.nuget.org/v3/index.json"
+      run_tests:
+        description: Run tests before packing
+        required: false
+        type: boolean
+        default: true
+      configuration:
+        description: Build configuration
+        required: false
+        type: string
+        default: Release
+      artifacts_path:
+        description: Output folder for packed nupkgs
+        required: false
+        type: string
+        default: "artifacts"
+      symbols:
+        description: Produce and push symbol packages
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      api_key:
+        description: API key (NuGet.org or GitHub Packages PAT)
+        required: true
+
+env:
+  NUGET_SOURCE: ${{ inputs.source }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate pack matrix
+        id: matrix
+        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-generate-build-matrix@main
+        with:
+          projects_glob: ${{ inputs.projects_glob }}
+          exclude_glob:  ${{ inputs.exclude_glob }}
+
+  build:
+    needs: prepare
+    if: ${{ fromJson(needs.prepare.outputs.matrix).include != null && fromJson(needs.prepare.outputs.matrix).include.size() > 0 }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET (with cache)
+        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-setup@main
+        with:
+          dotnet_version: ${{ inputs.dotnet_version }}
+
+      - name: Display build configuration
+        run: |
+          echo "Project:     ${{ matrix.project }}"
+          echo "NuGet feed:  ${{ env.NUGET_SOURCE }}"
+          echo "Version:     ${{ inputs.version }}"
+
+      - name: Restore
+        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-restore@main
+        with:
+          project: ${{ matrix.project }}
+
+      - name: Build
+        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-build@main
+        with:
+          project: ${{ matrix.project }}
+          configuration: ${{ inputs.configuration }}
+
+      - name: Test (solution-wide)
+        if: ${{ inputs.run_tests }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-test@main
+        with:
+          configuration: ${{ inputs.configuration }}
+
+      - name: Pack
+        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-pack@main
+        with:
+          project: ${{ matrix.project }}
+          configuration: ${{ inputs.configuration }}
+          artifacts_path: ${{ inputs.artifacts_path }}
+          version: ${{ inputs.version }}
+          symbols: ${{ inputs.symbols }}
+
+      - name: Push packages
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-push@main
+        with:
+          artifacts_path: ${{ inputs.artifacts_path }}
+          source: ${{ env.NUGET_SOURCE }}
+          api_key: ${{ secrets.api_key }}
+          push_symbols: ${{ inputs.symbols }}
