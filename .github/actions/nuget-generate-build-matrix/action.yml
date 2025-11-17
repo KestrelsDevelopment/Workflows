@@ -1,5 +1,6 @@
 name: NuGet - Generate Pack Matrix
 description: Discover packable csproj files and emit a build matrix
+
 inputs:
   projects_glob:
     description: Glob for projects (can be multiline)
@@ -7,10 +8,12 @@ inputs:
   exclude_globs:
     description: Glob(s) to exclude (can be multiline)
     required: true
+
 outputs:
   matrix:
     description: JSON matrix for strategy
     value: ${{ steps.gen.outputs.matrix }}
+
 runs:
   using: composite
   steps:
@@ -22,51 +25,72 @@ runs:
       run: |
         set -euo pipefail
         shopt -s globstar nullglob extglob
+
         if ! command -v jq >/dev/null 2>&1; then
-          sudo apt-get update -y
-          sudo apt-get install -y jq
+          if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y jq
+          else
+            echo "jq is required but not installed and apt-get is not available" >&2
+            exit 1
+          fi
         fi
-        project_patterns=$(git ls-files $PROJECTS_GLOB)
+
+        # Expand globs using git-tracked files
+        mapfile -t project_patterns < <(git ls-files $PROJECTS_GLOB || true)
+        mapfile -t exclude_patterns < <(git ls-files $EXCLUDE_GLOB || true)
+
         printf 'project_patterns:\n'
-        printf '  %s\n' "${project_patterns[@]}"
-        exclude_patterns=$(git ls-files $EXCLUDE_GLOB)    
+        printf '  %s\n' "${project_patterns[@]:-}"
+
         printf 'exclude_patterns:\n'
-        printf '  %s\n' "${exclude_patterns[@]}"
+        printf '  %s\n' "${exclude_patterns[@]:-}"
+
         include=()
+
         for pat in "${project_patterns[@]}"; do
           for f in $pat; do
             [[ -f "$f" ]] || continue
             [[ "$f" == *.csproj ]] || continue
+
             skip=false
             for ex in "${exclude_patterns[@]}"; do
-              [[ -z "$ex" ]] && continue
-              if [[ "$f" == $ex ]]; then
+              [[ -z "${ex:-}" ]] && continue
+              if [[ "$f" == "$ex" ]]; then
                 skip=true
                 break
               fi
             done
             $skip && continue
+
             if grep -Eq '<IsPackable>\s*false\s*</IsPackable>' "$f"; then
               continue
             fi
+
             include+=( "$f" )
           done
         done
-        if (( ${#include[@]} == 0 )); then
-          echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
-        json=$(jq -n --argjson arr "$(printf '%s\n' "${include[@]}" | jq -R . | jq -s .)" '
-          { include:
-              ( $arr
-                | map({
-                    project: .,
-                    project_dir: ( . | sub("/[^/]+$"; "") )
-                  })
-              )
-          }')
 
-        echo "matrix=$json" >> "$GITHUB_OUTPUT"
+        if (( ${#include[@]} == 0 )); then
+          json='{"include":[]}'
+        else
+          json=$(jq -c -n --argjson arr "$(printf '%s\n' "${include[@]}" | jq -R . | jq -s .)" '
+            { include:
+                ( $arr
+                  | map({
+                      project: .,
+                      project_dir: ( . | sub("/[^/]+$"; "") )
+                    })
+                )
+            }')
+        fi
+
+        # Escape for GitHub Actions output
+        json_escaped=${json//'%'/'%25'}
+        json_escaped=${json_escaped//$'\n'/'%0A'}
+        json_escaped=${json_escaped//$'\r'/'%0D'}
+
+        echo "matrix=$json_escaped" >> "$GITHUB_OUTPUT"
 
     - name: Matrix generated
       shell: bash
