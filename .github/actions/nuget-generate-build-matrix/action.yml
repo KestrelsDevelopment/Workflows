@@ -26,10 +26,10 @@ runs:
           sudo apt-get update -y
           sudo apt-get install -y jq
         fi
-        mapfile -t project_patterns < <(printf '%s\n' $PROJECTS_GLOB)
+        project_patterns=$(git ls-files $PROJECTS_GLOB)
         printf 'project_patterns:\n'
         printf '  %s\n' "${project_patterns[@]}"
-        mapfile -t exclude_patterns < <(printf '%s\n' $EXCLUDE_GLOB)        
+        exclude_patterns=$(git ls-files $EXCLUDE_GLOBS)    
         printf 'exclude_patterns:\n'
         printf '  %s\n' "${exclude_patterns[@]}"
         include=()
