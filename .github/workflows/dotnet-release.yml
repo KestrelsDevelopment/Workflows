@@ -13,11 +13,13 @@ on:
         required: false
         type: string
         default: "**/*.csproj"
-      exclude_glob:
+      exclude_globs:
         description: Glob to exclude (e.g., test projects)
         required: false
         type: string
-        default: "**/*[Tt]est*.csproj"
+        default: |
+          */*Demo*.csproj
+          */*Test*.csproj
       dotnet_version:
         description: .NET SDK version
         required: true
@@ -69,7 +71,7 @@ jobs:
         uses: KestrelsDevelopment/Workflows/.github/actions/nuget-generate-build-matrix@main
         with:
           projects_glob: ${{ inputs.projects_glob }}
-          exclude_glob:  ${{ inputs.exclude_glob }}
+          exclude_globs:  ${{ inputs.exclude_globs }}
       - name: Echo raw matrix string
         run: |
           echo 'raw matrix:'
