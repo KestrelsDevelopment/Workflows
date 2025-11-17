@@ -4,7 +4,7 @@ inputs:
   projects_glob:
     description: Glob for projects (can be multiline)
     required: true
-  exclude_glob:
+  exclude_globs:
     description: Glob(s) to exclude (can be multiline)
     required: true
 outputs:
@@ -18,7 +18,7 @@ runs:
       shell: bash
       env:
         PROJECTS_GLOB: ${{ inputs.projects_glob }}
-        EXCLUDE_GLOB: ${{ inputs.exclude_glob }}
+        EXCLUDE_GLOB: ${{ inputs.exclude_globs }}
       run: |
         set -euo pipefail
         shopt -s globstar nullglob extglob
