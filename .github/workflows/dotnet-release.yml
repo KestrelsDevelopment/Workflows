@@ -73,7 +73,8 @@ jobs:
 
   build:
     needs: prepare
-    if: ${{ fromJSON(needs.prepare.outputs.matrix).include != null && length(fromJSON(needs.prepare.outputs.matrix).include) > 0 }}
+    if: ${{ fromJSON(needs.prepare.outputs.matrix).include != null &&
+            toJSON(fromJSON(needs.prepare.outputs.matrix).include) != '[]' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
