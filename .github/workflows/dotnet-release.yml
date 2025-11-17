@@ -70,31 +70,12 @@ jobs:
         with:
           projects_glob: ${{ inputs.projects_glob }}
           exclude_glob:  ${{ inputs.exclude_glob }}
-      - name: Debug build matrix
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // The output is a JSON *string*. toJSON() gives us an escaped string.
-            const rawEscaped = ${{ toJSON(steps.matrix.outputs.matrix) }};
-            core.info('raw (escaped): ' + rawEscaped);
-  
-            // Unescape once to get the original JSON string
-            const raw = JSON.parse(rawEscaped);
-            core.info('raw (unescaped): ' + raw);
-  
-            // Parse again to get the object
-            let obj;
-            try {
-              obj = JSON.parse(raw);
-            } catch (e) {
-              core.setFailed('Failed to JSON.parse matrix: ' + e.message);
-              return;
-            }
-  
-            core.info('top-level keys: ' + Object.keys(obj));
-            const inc = obj.include || [];
-            core.info('include length: ' + inc.length);
-            core.info('include:\n' + JSON.stringify(inc, null, 2));
+      - name: Echo raw matrix string
+        run: |
+          echo 'raw matrix:'
+          echo '${{ steps.matrix.outputs.matrix }}'
+        shell: bash
+
 
 
   build:
