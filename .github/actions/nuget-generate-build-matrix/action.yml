@@ -29,7 +29,7 @@ runs:
         project_patterns=$(git ls-files $PROJECTS_GLOB)
         printf 'project_patterns:\n'
         printf '  %s\n' "${project_patterns[@]}"
-        exclude_patterns=$(git ls-files $EXCLUDE_GLOBS)    
+        exclude_patterns=$(git ls-files $EXCLUDE_GLOB)    
         printf 'exclude_patterns:\n'
         printf '  %s\n' "${exclude_patterns[@]}"
         include=()
