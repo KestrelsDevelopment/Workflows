@@ -1,33 +1,19 @@
-name: Build dotnet
-description: Build the dotnet solution
-author: AceOfKestrels
-
+name: NuGet - Build
+description: dotnet build with CI flags
 inputs:
-    restore:
-        description: "Whether to restore dependencies prior to building"
-        required: false
-        default: false
-    solution-path:
-        description: "The path to the .sln file relative to the repository root"
-        required: false
-        default: .
-    configuration:
-        description: "The configuration to use for the build"
-        required: false
-        default: Release
-
+  project:
+    description: Path to csproj
+    required: true
+  configuration:
+    description: Build configuration
+    required: true
+    default: Release
 runs:
-    using: composite
-    steps: 
-      - name: "Install dependencies"
-        if: ${{ inputs.restore == true }}
-        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-restore@main
-        with:
-            solution-path: ${{ inputs.solution-path }}
-
-      - name: "Build solution"
-        shell: bash
-        env:
-            SLN_PATH: ${{ inputs.solution-path }}
-            BUILD_CONF: ${{ inputs.configuration }}
-        run: dotnet build --no-restore --verbosity normal --configuration "$BUILD_CONF" "$SLN_PATH"
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        dotnet build "${{ inputs.project }}" \
+          -c "${{ inputs.configuration }}" \
+          --no-restore \
+          -p:ContinuousIntegrationBuild=true

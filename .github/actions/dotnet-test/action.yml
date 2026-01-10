@@ -1,45 +1,21 @@
-name: Test dotnet
-description: Test the dotnet solution
-author: AceOfKestrels
-
+# .github/actions/nuget-test/action.yml
+name: NuGet - Test
+description: Discover and run tests
 inputs:
-    restore:
-        description: "Whether to restore dependencies prior to building (implies build: true)"
-        required: false
-        default: false
-    build:
-        description: "Whether to build the solution prior to running tests"
-        required: false
-        default: false
-    solution-path:
-        description: "The path to the .sln file relative to the repository root"
-        required: false
-        default: .
-    configuration:
-        description: "The configuration to use for the build"
-        required: false
-        default: Release
-
+  configuration:
+    description: Build configuration
+    required: true
+    default: Release
 runs:
-    using: composite
-    steps: 
-      - name: "Install dependencies"
-        if: ${{ inputs.restore == true }}
-        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-restore@main
-        with:
-            solution-path: ${{ inputs.solution-path }}
-
-      - name: "Build solution"
-        if: ${{ inputs.restore == true || inputs.build == true }}
-        shell: bash
-        env:
-            SLN_PATH: ${{ inputs.solution-path }}
-            BUILD_CONF: ${{ inputs.configuration }}
-        run: dotnet build --no-restore --verbosity normal --configuration "$BUILD_CONF" "$SLN_PATH"
-
-      - name: "Run tests"
-        shell: bash
-        env:
-            SLN_PATH: ${{ inputs.solution-path }}
-            BUILD_CONF: ${{ inputs.configuration }}
-        run: dotnet test --no-build --verbosity normal --configuration "$BUILD_CONF" "$SLN_PATH"
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -e
+        shopt -s globstar nullglob
+        tests=( **/*[Tt]est*.csproj )
+        if (( ${#tests[@]} )); then
+          dotnet test -c "${{ inputs.configuration }}" --no-build --logger trx --results-directory TestResults
+        else
+          echo "No test projects found. Skipping."
+        fi

@@ -1,4 +1,4 @@
-﻿# .github/workflows/nuget-publish.yml
+﻿# .github/workflows/dotnet-publish.yml
 name: Build and Publish NuGet Packages
 
 on:
@@ -68,7 +68,7 @@ jobs:
 
       - name: Generate pack matrix
         id: matrix
-        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-generate-build-matrix@main
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-generate-build-matrix@main
         with:
           projects_glob: ${{ inputs.projects_glob }}
           exclude_globs:  ${{ inputs.exclude_globs }}
@@ -98,7 +98,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup .NET (with cache)
-        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-setup@main
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-setup@main
         with:
           dotnet_version: ${{ inputs.dotnet_version }}
 
@@ -109,24 +109,24 @@ jobs:
           echo "Version:     ${{ inputs.version }}"
 
       - name: Restore
-        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-restore@main
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-restore@main
         with:
           project: ${{ matrix.project }}
 
       - name: Build
-        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-build@main
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-build@main
         with:
           project: ${{ matrix.project }}
           configuration: ${{ inputs.configuration }}
 
       - name: Test (solution-wide)
         if: ${{ inputs.run_tests }}
-        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-test@main
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-test@main
         with:
           configuration: ${{ inputs.configuration }}
 
       - name: Pack
-        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-pack@main
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-pack@main
         with:
           project: ${{ matrix.project }}
           configuration: ${{ inputs.configuration }}
@@ -136,7 +136,7 @@ jobs:
 
       - name: Push packages
         if: ${{ github.event_name != 'pull_request' }}
-        uses: KestrelsDevelopment/Workflows/.github/actions/nuget-push@main
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-push@main
         with:
           artifacts_path: ${{ inputs.artifacts_path }}
           source: ${{ env.NUGET_SOURCE }}

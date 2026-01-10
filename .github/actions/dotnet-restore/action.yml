@@ -1,18 +1,11 @@
-name: Restore dotnet
-description: Restore the dotnet solution
-author: AceOfKestrels
-
+name: NuGet - Restore
+description: dotnet restore
 inputs:
-    solution-path:
-        description: "The path to the .sln file relative to the repository root"
-        required: false
-        default: .
-
+  project:
+    description: Path to csproj
+    required: true
 runs:
-    using: composite
-    steps: 
-      - name: "Install dependencies"
-        shell: bash
-        env:
-            SLN_PATH: ${{ inputs.solution-path }}
-        run: dotnet restore --verbosity normal "$SLN_PATH"
+  using: composite
+  steps:
+    - shell: bash
+      run: dotnet restore "${{ inputs.project }}"

@@ -1,82 +1,91 @@
 name: "Dotnet CI"
 
 on:
-    workflow_call:
-        inputs:
-            run-tests:
-                type: boolean
-                required: false
-                default: true
-            dotnet-version:
-                description: The dotnet version to use
-                required: true
-                type: string
-            solution-path:
-                description: The path to the solution file
-                required: false
-                type: string
-                default: .
-            configuration:
-                description: The configuration to use for the builds
-                required: false
-                type: string
-                default: Release
+  workflow_call:
+    inputs:
+      dotnet_version:
+        description: The dotnet version to use
+        required: false
+        type: string
+        default: "10.x"
+      projects_glob:
+        description: Glob to discover csproj files
+        required: false
+        type: string
+        default: "**/*.csproj"
+      exclude_globs:
+        description: Glob to exclude
+        required: false
+        type: string
+        default: ""
+      configuration:
+        description: The configuration to use for the builds
+        required: false
+        type: string
+        default: Release
+      run_tests:
+        type: boolean
+        required: false
+        default: true
 
 permissions:
-    contents: read
+  contents: read
 
 jobs:
-    build:
-        name: Build
-        runs-on: ubuntu-latest
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-        steps:
-          - name: Checkout repository
-            uses: actions/checkout@v3
+      - name: Generate build matrix
+        id: matrix
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-generate-build-matrix@main
+        with:
+          projects_glob: ${{ inputs.projects_glob }}
+          exclude_globs: ${{ inputs.exclude_globs }}
+      
+      - name: Echo raw matrix string
+        run: |
+          echo 'raw matrix:'
+          echo '${{ steps.matrix.outputs.matrix }}'
+        shell: bash
 
-          - name: Setup dotnet
-            uses: actions/setup-dotnet@v4
-            with:
-                dotnet-version: ${{ inputs.dotnet-version }}
+  build:
+    name: Build
+    needs: prepare
+    if: ${{ fromJSON(needs.prepare.outputs.matrix).include != null && toJSON(fromJSON(needs.prepare.outputs.matrix).include) != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
 
-          - name: Install dependencies
-            uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-restore@main
-            with:
-                solution-path: ${{ inputs.solution-path }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-          - name: Build solution
-            uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-build@main
-            with:
-                solution-path: ${{ inputs.solution-path }}
-                configuration: ${{ inputs.configuration }}
+      - name: Setup dotnet
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-setup@main
+        with:
+          dotnet_version: ${{ inputs.dotnet_version }}
 
-    test:
-        name: Test
-        runs-on: ubuntu-latest
-        if: ${{ inputs.run-tests }}
+      - name: Restore dependencies
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-restore@main
+        with:
+          project: ${{ matrix.project }}
 
-        steps:
-          - name: Checkout repository
-            uses: actions/checkout@v3
+      - name: Build project
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-build@main
+        with:
+          project: ${{ matrix.project }}
+          configuration: ${{ inputs.configuration }}
 
-          - name: Setup dotnet
-            uses: actions/setup-dotnet@v4
-            with:
-                dotnet-version: ${{ inputs.dotnet-version }}
-
-          - name: Install dependencies
-            uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-restore@main
-            with:
-                solution-path: ${{ inputs.solution-path }}
-
-          - name: Build solution
-            uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-build@main
-            with:
-                solution-path: ${{ inputs.solution-path }}
-                configuration: ${{ inputs.configuration }}
-
-          - name: Run tests
-            uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-test@main
-            with:
-                solution-path: ${{ inputs.solution-path }}
-                configuration: ${{ inputs.configuration }}
+      - name: Run tests
+        if: ${{ inputs.run_tests }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-test@main
+        with:
+          configuration: ${{ inputs.configuration }}
