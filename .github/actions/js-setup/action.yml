@@ -1,0 +1,29 @@
+name: JS - Setup
+description: Setup Node.js and cache
+
+inputs:
+    node_version:
+        description: Node.js version
+        required: false
+        default: "22"
+    registry_url:
+        description: Registry URL
+        required: false
+        default: "https://registry.npmjs.org"
+    scope:
+        description: Scope for registry
+        required: false
+
+runs:
+    using: composite
+    steps:
+        - name: Setup Node.js
+          uses: actions/setup-node@v4
+          with:
+              node-version: ${{ inputs.node_version }}
+              registry-url: ${{ inputs.registry_url }}
+              scope: ${{ inputs.scope }}
+              cache: 'npm'
+        - name: Install dependencies
+          shell: bash
+          run: npm ci

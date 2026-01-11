@@ -1,0 +1,15 @@
+name: JS - Test
+description: Run npm test
+
+inputs:
+    project_dir:
+        description: Directory containing package.json
+        required: true
+
+runs:
+    using: composite
+    steps:
+        - name: Test
+          shell: bash
+          working-directory: ${{ inputs.project_dir }}
+          run: npm test --if-present

@@ -1,0 +1,87 @@
+name: "JS CI"
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        description: Node version
+        required: false
+        type: string
+        default: "20"
+      projects_glob:
+        description: Glob to discover package.json
+        required: false
+        type: string
+        default: "**/package.json"
+      exclude_globs:
+        description: Glob to exclude
+        required: false
+        type: string
+        default: "**/node_modules/**"
+      run_tests:
+        type: boolean
+        required: false
+        default: true
+      run_lint:
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate build matrix
+        id: matrix
+        uses: KestrelsDevelopment/Workflows/.github/actions/js-generate-build-matrix@main
+        with:
+          projects_glob: ${{ inputs.projects_glob }}
+          exclude_globs: ${{ inputs.exclude_globs }}
+
+      - name: Debug matrix
+        run: |
+          echo '${{ steps.matrix.outputs.matrix }}'
+        shell: bash
+
+  build:
+    name: Build & Check
+    needs: prepare
+    if: ${{ fromJSON(needs.prepare.outputs.matrix).include != null && toJSON(fromJSON(needs.prepare.outputs.matrix).include) != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: KestrelsDevelopment/Workflows/.github/actions/js-setup@main
+        with:
+          node_version: ${{ inputs.node_version }}
+          
+      - name: Lint (ESLint)
+        if: ${{ inputs.run_lint }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/js-lint@main
+        with:
+          project_dir: ${{ matrix.project_dir }}
+
+      - name: Build
+        uses: KestrelsDevelopment/Workflows/.github/actions/js-build@main
+        with:
+          project_dir: ${{ matrix.project_dir }}
+
+      - name: Test
+        if: ${{ inputs.run_tests }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/js-test@main
+        with:
+          project_dir: ${{ matrix.project_dir }}

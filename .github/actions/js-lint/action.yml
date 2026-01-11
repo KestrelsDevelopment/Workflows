@@ -1,0 +1,22 @@
+name: JS - Lint
+description: Run ESLint using project configuration
+
+inputs:
+    project_dir:
+        description: Directory containing package.json
+        required: true
+
+runs:
+    using: composite
+    steps:
+        - name: Run ESLint
+          shell: bash
+          working-directory: ${{ inputs.project_dir }}
+          run: |
+              if [ -f "./node_modules/.bin/eslint" ]; then
+                echo "ESLint found, running lint..."
+                npx --no-install eslint .
+              else
+                echo "::warning::ESLint not found in node_modules. Skipping lint step."
+                echo "To enable linting, ensure 'eslint' is listed in devDependencies in package.json."
+              fi
