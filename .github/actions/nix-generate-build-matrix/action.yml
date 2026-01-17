@@ -1,0 +1,103 @@
+
+name: Nix - Generate Build Matrix
+description: Discover flake.nix files and emit a build matrix
+
+inputs:
+    projects_glob:
+        description: Glob for flake.nix files (can be multiline)
+        required: false
+        default: "**/flake.nix"
+    exclude_globs:
+        description: Glob(s) to exclude (can be multiline)
+        required: false
+        default: ""
+
+outputs:
+    matrix:
+        description: JSON matrix for strategy
+        value: ${{ steps.gen.outputs.matrix }}
+
+runs:
+    using: composite
+    steps:
+        - id: gen
+          shell: bash
+          env:
+              PROJECTS_GLOB: ${{ inputs.projects_glob }}
+              EXCLUDE_GLOB: ${{ inputs.exclude_globs }}
+          run: |
+              set -euo pipefail
+              shopt -s globstar nullglob extglob
+              
+              # Ensure jq is installed
+              if ! command -v jq >/dev/null 2>&1; then
+                if command -v apt-get >/dev/null 2>&1; then
+                  sudo apt-get update -y && sudo apt-get install -y jq
+                else
+                  echo "jq is required but not installed" >&2
+                  exit 1
+                fi
+              fi
+              
+              echo "Searching for projects matching: $PROJECTS_GLOB"
+              
+              # Expand globs using git-tracked files.
+              mapfile -t project_patterns < <(git ls-files "$PROJECTS_GLOB" || true)
+              mapfile -t exclude_patterns < <(git ls-files "$EXCLUDE_GLOB" || true)
+              
+              include=()
+              
+              for pat in "${project_patterns[@]}"; do
+                for f in $pat; do
+                  [[ -f "$f" ]] || continue
+                  [[ "$(basename "$f")" == "flake.nix" ]] || continue
+              
+                  # Handle exclusions
+                  skip=false
+                  for ex in "${exclude_patterns[@]}"; do
+                    [[ -z "${ex:-}" ]] && continue
+                    if [[ "$f" == "$ex" ]]; then
+                      skip=true
+                      break
+                    fi
+                  done
+                  $skip && continue
+              
+                  # Add to list
+                  include+=( "$f" )
+                done
+              done
+              
+              # Fallback: If nothing found but flake.nix exists in root, use it.
+              if (( ${#include[@]} == 0 )); then
+                if [[ -f "flake.nix" ]]; then
+                   echo "No glob matches found, but root flake.nix exists. Adding it."
+                   include+=( "flake.nix" )
+                fi
+              fi
+              
+              if (( ${#include[@]} == 0 )); then
+                echo "::warning::No flake.nix files found matching '$PROJECTS_GLOB'."
+                json='{"include":[]}'
+              else
+                # Generate JSON array with metadata
+                json=$(jq -c -n --argjson arr "$(printf '%s\n' "${include[@]}" | jq -R . | jq -s .)" '
+                  { include:
+                      ( $arr
+                        | map({
+                            flake_file: .,
+                            project_dir: ( if . == "flake.nix" then "." else ( . | sub("/[^/]+$"; "") ) end ),
+                            project_name: ( . | sub(".*/"; "") )
+                          })
+                      )
+                  }')
+              fi
+              
+              echo "Generated Matrix: $json"
+              
+              # Escape for GitHub Actions output
+              json_escaped=${json//'%'/'%25'}
+              json_escaped=${json_escaped//$'\n'/'%0A'}
+              json_escaped=${json_escaped//$'\r'/'%0D'}
+              
+              echo "matrix=$json_escaped" >> "$GITHUB_OUTPUT"
