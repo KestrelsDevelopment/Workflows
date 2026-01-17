@@ -1,19 +1,40 @@
-name: Update nix flake
-description: Update the nix flake and commit the changes back
+name: Parse nix files
+description: Attempt to parse all .nix files in the repository.
 author: AceOfKestrels
 
 inputs:
-    flake-path:
-        description: "The path to the flake relative to the repository root"
-        required: false
-        default: .
+  project_dir:
+    description: Directory containing flake.nix
+    required: true
+  update_lock_file:
+    description: "Whether to update the flakes' lock files before checking"
+    required: false
+    default: "false"
 
 runs:
-    using: composite
-    steps: 
-      - name: "Update lock file"
-        shell: bash
-        env:
-            FLAKE_PATH: ${{ inputs.flake-path }}
-            NIX_CONFIG: "experimental-features = nix-command flakes"
-        run: nix flake update --flake "./$FLAKE_PATH"
+  using: composite
+  steps:
+    - name: Check Flakes
+      shell: bash
+      working-directory: ${{ inputs.project_dir }}
+      env:
+        UPDATE_LOCK_FILE: ${{ inputs.update_lock_file }}
+        NIX_CONFIG: "experimental-features = nix-command flakes"
+      run: |
+        set -euo pipefail
+        
+        echo "→ Checking flake in $(pwd)"
+        
+        if [ "$UPDATE_LOCK_FILE" == "true" ]; then
+            if ! nix flake update; then
+                echo "  ✗ failed to update lock file"
+                exit 1
+            fi
+        fi
+        
+        if nix flake check --quiet --no-update-lock-file >/dev/null; then
+            echo "  ✓ Flake passed check"
+        else
+            echo "  ✗ Flake failed check"
+            exit 1
+        fi
