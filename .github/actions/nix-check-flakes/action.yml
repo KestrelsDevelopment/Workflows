@@ -1,52 +1,40 @@
-name: Parse nix files
-description: Attempt to parse all .nix files in the repository.
+name: Check Flakes
+description: Check a flake for errors
 author: AceOfKestrels
 
 inputs:
+    project_dir:
+        description: Directory containing flake.nix
+        required: true
     update_lock_file:
         description: "Whether to update the flakes' lock files before checking"
         required: false
-        default: false
+        default: "false"
 
 runs:
     using: composite
-    steps: 
-      - name: Check Flakes
-        shell: bash
-        env:
-            UPDATE_LOCK_FILE: ${{ inputs.update_lock_file }}
-            NIX_CONFIG: "experimental-features = nix-command flakes"
-        run: |
-            set -euo pipefail
-
-            failures=0
-
-            for file in $(git ls-files '*/flake.nix'); do
-                flake="./$(dirname "$file")"
-
-                echo "→ Checking $flake"
-
-                if [ "$UPDATE_LOCK_FILE" == "true" ]; then
-                    if ! nix flake update --flake "$flake"; then
-                        echo "  ✗ failed to update lock file for $flake"
-                        failures=$((failures+1))
-                        continue
-                    fi
-                fi
-
-                if nix flake check "./$flake" --quiet --no-update-lock-file >/dev/null; then
-                    echo "  ✓ $flake"
-                else
-                    echo "  ✗ $flake"
-                    failures=$((failures+1))
-                fi
-            done
-
-            echo
-
-            if [ "$failures" -ne 0 ]; then
-                echo "❌ $failures flake(s) failed validation."
-                exit 1
-            else
-                echo "✅ All flakes passed!"
-            fi
+    steps:
+        - name: Check Flakes
+          shell: bash
+          working-directory: ${{ inputs.project_dir }}
+          env:
+              UPDATE_LOCK_FILE: ${{ inputs.update_lock_file }}
+              NIX_CONFIG: "experimental-features = nix-command flakes"
+          run: |
+              set -euo pipefail
+              
+              echo "→ Checking flake in $(pwd)"
+              
+              if [ "$UPDATE_LOCK_FILE" == "true" ]; then
+                  if ! nix flake update; then
+                      echo "  ✗ failed to update lock file"
+                      exit 1
+                  fi
+              fi
+              
+              if nix flake check --quiet --no-update-lock-file >/dev/null; then
+                  echo "  ✓ Flake passed check"
+              else
+                  echo "  ✗ Flake failed check"
+                  exit 1
+              fi
