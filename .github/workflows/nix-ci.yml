@@ -1,0 +1,154 @@
+name: "Nix CI"
+
+on:
+  workflow_call:
+    inputs:
+      projects_glob:
+        description: Glob to discover flake.nix
+        required: false
+        type: string
+        default: "**/flake.nix"
+      exclude_globs:
+        description: Glob to exclude
+        required: false
+        type: string
+        default: ""
+      flake-path:
+        description: Path to the flake (relative to repo root). Overrides glob discovery.
+        required: false
+        type: string
+        default: ""
+      check_current:
+        description: Check flake with current lockfile
+        type: boolean
+        default: true
+      check_updated:
+        description: Check flake with updated lockfile
+        type: boolean
+        default: false
+      run_lint:
+        description: Run linters
+        type: boolean
+        default: true
+  
+permissions:
+  contents: read
+  
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix || steps.manual.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate build matrix
+        if: ${{ inputs.flake-path == '' }}
+        id: generate
+        uses: KestrelsDevelopment/Workflows/.github/actions/nix-generate-build-matrix@main
+        with:
+          projects_glob: ${{ inputs.projects_glob }}
+          exclude_globs: ${{ inputs.exclude_globs }}
+
+      - name: Manual matrix
+        if: ${{ inputs.flake-path != '' }}
+        id: manual
+        run: |
+          echo "matrix={\"include\":[{\"project_dir\":\"${{ inputs.flake-path }}\"}]}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Debug matrix
+        run: |
+          echo '${{ steps.generate.outputs.matrix || steps.manual.outputs.matrix }}'
+        shell: bash
+  
+  lint-scripts:
+    name: Lint Scripts (Bash/Zsh)
+    if: ${{ inputs.run_lint }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y shellcheck
+
+      - name: Install Zsh
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y zsh
+
+      - name: Run ShellCheck
+        run: |
+          set -euo pipefail
+          failures=0
+          for script in $(git ls-files '*.sh'); do
+            if shellcheck "$script"; then
+              echo "  ✓ $script"
+            else
+              echo "  ✗ $script"
+              failures=$((failures+1))
+            fi
+          done
+          if [ "$failures" -ne 0 ]; then
+            echo -e "\n❌ $failures files failed ShellCheck."
+            exit 1
+          fi
+
+      - name: Run Zsh Syntax Check
+        run: |
+          set -euo pipefail
+          failures=0
+          for script in $(git ls-files '*.sh'); do
+            if zsh -n "$script"; then
+              echo "  ✓ $script"
+            else
+              echo "  ✗ $script"
+              failures=$((failures+1))
+            fi
+          done
+          if [ "$failures" -ne 0 ]; then
+            echo -e "\n❌ $failures files failed Zsh syntax check."
+            exit 1
+          fi
+  
+  check:
+    name: Check Flake
+    needs: prepare
+    if: ${{ fromJSON(needs.prepare.outputs.matrix).include != null && toJSON(fromJSON(needs.prepare.outputs.matrix).include) != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Lint Nix
+        if: ${{ inputs.run_lint }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/nix-lint@main
+        with:
+          project_dir: ${{ matrix.project_dir }}
+
+      - name: Check Flake (Current)
+        if: ${{ inputs.check_current }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/nix-check-flakes@main
+        with:
+          project_dir: ${{ matrix.project_dir }}
+          update_lock_file: false
+
+      - name: Check Flake (Updated)
+        if: ${{ inputs.check_updated }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/nix-check-flakes@main
+        with:
+          project_dir: ${{ matrix.project_dir }}
+          update_lock_file: true
