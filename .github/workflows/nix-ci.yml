@@ -65,6 +65,7 @@ jobs:
   
   lint-scripts:
     name: Lint Scripts (Bash/Zsh)
+    needs: prepare
     if: ${{ inputs.run_lint }}
     runs-on: ubuntu-latest
     steps:
@@ -145,6 +146,30 @@ jobs:
         with:
           project_dir: ${{ matrix.project_dir }}
           update_lock_file: false
+          
+  check-updated:
+    name: Check Updated Flake
+    needs: prepare
+    if: ${{ fromJSON(needs.prepare.outputs.matrix).include != null && toJSON(fromJSON(needs.prepare.outputs.matrix).include) != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Lint Nix
+        if: ${{ inputs.run_lint }}
+        uses: KestrelsDevelopment/Workflows/.github/actions/nix-lint@main
+        with:
+          project_dir: ${{ matrix.project_dir }}
 
       - name: Check Flake (Updated)
         if: ${{ inputs.check_updated }}
