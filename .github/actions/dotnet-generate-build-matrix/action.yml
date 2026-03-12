@@ -26,6 +26,7 @@ runs:
         set -euo pipefail
         shopt -s globstar nullglob extglob
 
+        # Ensure jq is installed
         if ! command -v jq >/dev/null 2>&1; then
           if command -v apt-get >/dev/null 2>&1; then
             sudo apt-get update -y
@@ -36,41 +37,60 @@ runs:
           fi
         fi
 
-        # Expand globs using git-tracked files
-        mapfile -t project_patterns < <(git ls-files $PROJECTS_GLOB || true)
-        mapfile -t exclude_patterns < <(git ls-files $EXCLUDE_GLOB || true)
-
-        printf 'project_patterns:\n'
-        printf '  %s\n' "${project_patterns[@]:-}"
-
-        printf 'exclude_patterns:\n'
-        printf '  %s\n' "${exclude_patterns[@]:-}"
+        # Read multiline globs into Bash arrays safely
+        mapfile -t in_globs <<< "$PROJECTS_GLOB"
+        mapfile -t ex_globs <<< "$EXCLUDE_GLOB"
 
         include=()
 
-        for pat in "${project_patterns[@]}"; do
-          for f in $pat; do
-            [[ -f "$f" ]] || continue
-            [[ "$f" == *.csproj ]] || continue
+        # Get all tracked .csproj files once
+        mapfile -t all_csproj < <(git ls-files '*.csproj' || true)
 
-            skip=false
-            for ex in "${exclude_patterns[@]}"; do
-              [[ -z "${ex:-}" ]] && continue
-              if [[ "$f" == "$ex" ]]; then
-                skip=true
-                break
-              fi
-            done
-            $skip && continue
+        for f in "${all_csproj[@]}"; do
 
-            if grep -Eq '<IsPackable>\s*false\s*</IsPackable>' "$f"; then
-              continue
+          # 1. Check if the file matches our INCLUDE globs
+          is_included=false
+          for ig in "${in_globs[@]}"; do
+            # Strip whitespace/carriage returns
+            ig=$(echo "$ig" | tr -d '\r' | xargs)
+            [[ -z "$ig" ]] && continue
+
+            # Bash pattern match (no quotes around $ig)
+            if [[ $f == $ig ]]; then
+              is_included=true
+              break
             fi
-
-            include+=( "$f" )
           done
+
+          # If it didn't match any include glob, skip it
+          [[ "$is_included" == "false" ]] && continue
+
+          # 2. Check if the file matches our EXCLUDE globs
+          is_excluded=false
+          for eg in "${ex_globs[@]}"; do
+            eg=$(echo "$eg" | tr -d '\r' | xargs)
+            [[ -z "$eg" ]] && continue
+
+            # Bash pattern match (no quotes around $eg)
+            if [[ $f == $eg ]]; then
+              is_excluded=true
+              break
+            fi
+          done
+
+          # If it matched an exclude glob, skip it
+          [[ "$is_excluded" == "true" ]] && continue
+
+          # 3. Check for IsPackable false
+          if grep -Eqi '<IsPackable>\s*false\s*</IsPackable>' "$f"; then
+            continue
+          fi
+
+          # 4. If we made it here, add it to our include list
+          include+=( "$f" )
         done
 
+        # Build JSON output using jq
         if (( ${#include[@]} == 0 )); then
           json='{"include":[]}'
         else

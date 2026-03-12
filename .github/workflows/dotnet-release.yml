@@ -9,17 +9,15 @@ on:
         required: true
         type: string
       projects_glob:
-        description: Glob to discover packable csproj files
+        description: Glob to discover csproj files
         required: false
         type: string
         default: "**/*.csproj"
       exclude_globs:
-        description: Glob to exclude (e.g., test projects)
+        description: Glob to exclude
         required: false
         type: string
-        default: |
-          */*Demo*.csproj
-          */*Test*.csproj
+        default: "tests/**"
       dotnet_version:
         description: .NET SDK version
         required: true
