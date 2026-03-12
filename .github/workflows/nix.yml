@@ -37,7 +37,7 @@ jobs:
             matrix: ${{ steps.matrix.outputs.matrix }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Generate build matrix
               id: matrix
@@ -62,7 +62,7 @@ jobs:
         
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Install Nix
               uses: cachix/install-nix-action@v31
