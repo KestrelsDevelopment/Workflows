@@ -46,6 +46,7 @@ runs:
         # Get all tracked .csproj files once
         mapfile -t all_csproj < <(git ls-files '*.csproj' || true)
 
+        echo "Found Files $all_csproj"
         for f in "${all_csproj[@]}"; do
 
           # 1. Check if the file matches our INCLUDE globs
@@ -110,6 +111,7 @@ runs:
         json_escaped=${json_escaped//$'\n'/'%0A'}
         json_escaped=${json_escaped//$'\r'/'%0D'}
 
+        echo "Inclued Files $all_csproj"
         echo "matrix=$json_escaped" >> "$GITHUB_OUTPUT"
 
     - name: Matrix generated
