@@ -2,6 +2,9 @@
 name: NuGet - Test
 description: Discover and run tests
 inputs:
+  project:
+    description: Path to csproj
+    required: true
   configuration:
     description: Build configuration
     required: true
@@ -11,11 +14,16 @@ runs:
   steps:
     - shell: bash
       run: |
-        set -e
-        shopt -s globstar nullglob
-        tests=( **/*[Tt]est*.csproj )
-        if (( ${#tests[@]} )); then
-          dotnet test -c "${{ inputs.configuration }}" --no-build --logger trx --results-directory TestResults
+        if grep -q "Microsoft.NET.Test.Sdk" "${{ inputs.project }}"; then
+            echo "Test project found!"
+        elif grep -q "TUnit" "${{ inputs.project }}"; then
+            echo "Test project found!"
         else
-          echo "No test projects found. Skipping."
+            echi "Not a test project. Skipping..."
+            exit 0
         fi
+
+        dotnet run "${{ inputs.project }}" \
+          -c "${{ inputs.configuration }}" \
+          --no-restore \
+          -p:ContinuousIntegrationBuild=true

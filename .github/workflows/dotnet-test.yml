@@ -46,7 +46,7 @@ jobs:
         with:
           projects_glob: ${{ inputs.projects_glob }}
           exclude_globs: ${{ inputs.exclude_globs }}
-      
+
       - name: Echo raw matrix string
         run: |
           echo 'raw matrix:'
@@ -88,4 +88,5 @@ jobs:
         if: ${{ inputs.run_tests }}
         uses: KestrelsDevelopment/Workflows/.github/actions/dotnet-test@main
         with:
+          project: ${{ matrix.project }}
           configuration: ${{ inputs.configuration }}
