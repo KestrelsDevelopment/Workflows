@@ -23,7 +23,7 @@ runs:
             exit 0
         fi
 
-        dotnet run "${{ inputs.project }}" \
+        dotnet run --project "${{ inputs.project }}" \
           -c "${{ inputs.configuration }}" \
           --no-restore \
           -p:ContinuousIntegrationBuild=true
