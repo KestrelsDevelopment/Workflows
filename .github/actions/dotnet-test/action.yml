@@ -19,7 +19,7 @@ runs:
         elif grep -q "TUnit" "${{ inputs.project }}"; then
             echo "Test project found!"
         else
-            echi "Not a test project. Skipping..."
+            echo "Not a test project. Skipping..."
             exit 0
         fi
 
