@@ -82,14 +82,6 @@ runs:
             fi
           done
 
-          # If it matched an exclude glob, skip it
-          [[ "$is_excluded" == "true" ]] && continue
-
-          # 3. Check for IsPackable false
-          if grep -Eqi '<IsPackable>\s*false\s*</IsPackable>' "$f"; then
-            continue
-          fi
-
           # 4. If we made it here, add it to our include list
           include+=( "$f" )
         done
